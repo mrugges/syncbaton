@@ -1,0 +1,27 @@
+# Runs syncbaton next to a Syncthing that is already running on the same host.
+#
+# Host networking lets the container reach a Syncthing GUI/API that listens on 127.0.0.1:8384.
+# Put `listen = "127.0.0.1:8790"` (or a Tailscale address) in syncbaton.toml; with host networking
+# the port is published exactly as configured, so do not use 0.0.0.0 on an untrusted network.
+#
+# user: must be the uid:gid that can read the synced folder (the one Syncthing runs as).
+# The paths in syncbaton.toml are the paths inside the container: here /srv/music, and
+# api_key_file = "/run/secrets/syncthing-api-key".
+services:
+  syncbaton:
+    build: ../../server
+    # image: your-registry/syncbaton:latest
+    restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ./syncbaton.toml:/etc/syncbaton.toml:ro
+      - ./syncthing-api-key:/run/secrets/syncthing-api-key:ro
+      - /srv/music:/srv/music:ro
+      - syncbaton-state:/var/lib/syncbaton
+
+volumes:
+  syncbaton-state:

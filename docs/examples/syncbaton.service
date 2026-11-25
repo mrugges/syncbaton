@@ -1,0 +1,56 @@
+# /etc/systemd/system/syncbaton.service
+#
+# Runs syncbaton as the user Syncthing runs as, so it can read the synced folder.
+# Replace "syncthing" in User=/Group= if your Syncthing runs as someone else.
+# /etc/syncbaton.toml must be readable by that user (for example mode 0640, group syncthing).
+# `syncbaton token add` rewrites that file, so run it as root, then restart this unit.
+
+[Unit]
+Description=syncbaton project locking for Syncthing folders
+After=network-online.target syncthing.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=syncthing
+Group=syncthing
+# Adjust the path to where the syncbaton executable is installed (see docs/server.md).
+ExecStart=/usr/local/bin/syncbaton serve --config /etc/syncbaton.toml --state-dir /var/lib/syncbaton
+Restart=on-failure
+RestartSec=5
+
+# State: SQLite database with the held projects and the event log.
+StateDirectory=syncbaton
+ReadWritePaths=/var/lib/syncbaton
+
+# Hardening. ProtectSystem=strict makes the whole file system read-only except the paths named
+# in ReadWritePaths. syncbaton never writes to the synced folders, so they are also listed under
+# ReadOnlyPaths; add one entry per [[folder]] path from /etc/syncbaton.toml.
+ReadOnlyPaths=/srv/music
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+ProtectProc=invisible
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+MemoryDenyWriteExecute=yes
+KeyringMode=private
+RemoveIPC=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
