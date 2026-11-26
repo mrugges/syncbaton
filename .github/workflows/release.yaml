@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      # The tag, the server's version and the app's version must agree
+      - name: Check versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          server=$(sed -n 's/^version = "\(.*\)"/\1/p' server/pyproject.toml)
+          app=$(cat macos/VERSION)
+          echo "tag=$tag server=$server app=$app"
+          [ "$tag" = "$server" ] && [ "$tag" = "$app" ]
+      - name: Server wheel
+        working-directory: server
+        run: uv build --wheel --out-dir ../dist
+      - name: macOS app
+        working-directory: macos
+        run: |
+          scripts/bundle.sh
+          cp build/Syncbaton.zip "../dist/Syncbaton-${GITHUB_REF_NAME#v}.zip"
+      - name: Checksums
+        working-directory: dist
+        run: shasum -a 256 * > SHA256SUMS
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: dist/*
+          generate_release_notes: true
